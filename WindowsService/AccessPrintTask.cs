@@ -17,6 +17,8 @@ namespace WindowsService
          */
     //https://stackoverflow.com/questions/837754/call-routine-in-access-module-from-net
     //http://www.itgo.me/a/x438014096864530466/call-routine-in-access-module-from-net
+    //Find DCOM
+    //https://forums.asp.net/t/1110648.aspx?Cannot+find+Microsoft+Word+Application+in+DCOM
     public class AccessPrintTask
     {
         static readonly ILog Logger = LogManager.GetLogger("Service1");
