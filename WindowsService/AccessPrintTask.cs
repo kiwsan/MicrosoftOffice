@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -23,9 +24,10 @@ namespace WindowsService
     {
         static readonly ILog Logger = LogManager.GetLogger("Service1");
         private static object _locker = new Object();
+        public static List<int> _currentProcess { get; set; }
         public AccessPrintTask()
         {
-
+            if (_currentProcess == null) { _currentProcess = new List<int>(); }
         }
 
         public void Start()
@@ -33,7 +35,7 @@ namespace WindowsService
             try
             {
                 // Kill opened word instances.  
-                if (KillProcess("MSACCESS"))
+                if (KillProcess(_currentProcess)) //"MSACCESS"
                 {
                     // Thread safe.  
                     lock (_locker)
@@ -48,6 +50,10 @@ namespace WindowsService
                             Application microsoftAccess = new Application();
                             microsoftAccess.OpenCurrentDatabase(fileName);
 
+                            int id;
+                            GetWindowThreadProcessId(microsoftAccess.hWndAccessApp(), out id);
+                            _currentProcess.Add(id);
+
                             var myName = microsoftAccess.Run("GetName");
 
                             Logger.Info($"My Name: {myName}");
@@ -55,7 +61,7 @@ namespace WindowsService
                             if (microsoftAccess != null)
                             {
                                 microsoftAccess.Quit();
-                                System.Runtime.InteropServices.Marshal.ReleaseComObject(microsoftAccess);
+                                Marshal.ReleaseComObject(microsoftAccess);
                                 microsoftAccess = null;
 
                                 Logger.Info("Quit..");
@@ -65,21 +71,24 @@ namespace WindowsService
 
                 }
             }
-            catch (Exception ex )
+            catch (Exception ex)
             {
                 Logger.Error(ex);
                 Logger.Info("KillProcess..");
-                KillProcess("MSACCESS");
+                KillProcess(_currentProcess);
             }
         }
 
-        private static bool KillProcess(string name)
+        [DllImport("user32.dll")]
+        static extern int GetWindowThreadProcessId(int hWnd, out int lpdwProcessId);
+
+        private static bool KillProcess(List<int> objProcess)
         {
-            foreach (Process clsProcess in Process.GetProcesses().Where(p => p.ProcessName.Contains(name)))
+            foreach (Process clsProcess in Process.GetProcesses().Where(p => objProcess.Contains(p.Id)))
             {
                 if (Process.GetCurrentProcess().Id == clsProcess.Id)
                     continue;
-                if (clsProcess.ProcessName.Contains(name))
+                if (objProcess.Contains(clsProcess.Id))
                 {
                     clsProcess.Kill();
                     return true;
